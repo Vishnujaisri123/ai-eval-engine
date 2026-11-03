@@ -1,0 +1,38 @@
+[
+  {
+    "id": "TC001",
+    "category": "power_consumption",
+    "prompt": "How much power does the Atomberg Renesa smart ceiling fan consume at top speed?",
+    "context": "The Atomberg Renesa ceiling fan uses an energy-efficient BLDC motor that consumes 28W at speed 5 and saves up to 65% electricity.",
+    "expected_output": "The Atomberg Renesa fan uses a BLDC motor and consumes 28W at top speed.",
+    "expected_keywords": ["28w", "bldc"],
+    "actual_output": "The Atomberg Renesa smart fan runs on a BLDC motor and consumes 28W at speed 5, saving up to 65% electricity."
+  },
+  {
+    "id": "TC002",
+    "category": "smart_features",
+    "prompt": "Can I control the Atomberg Aris smart fan using Alexa or Google Home?",
+    "context": "The Atomberg Aris Starlight smart fan connects via the Atomberg Home App over Wi-Fi and supports voice control through Amazon Alexa and Google Home.",
+    "expected_output": "Yes, the Atomberg Aris smart fan supports voice control via Amazon Alexa and Google Home using the Atomberg Home App.",
+    "expected_keywords": ["alexa", "google home", "atomberg home app"],
+    "actual_output": "Yes, you can control the Atomberg Aris fan with Amazon Alexa and Google Home after connecting it to Wi-Fi via the Atomberg Home App."
+  },
+  {
+    "id": "TC003",
+    "category": "warranty_policy",
+    "prompt": "What is the warranty period for Atomberg BLDC fans?",
+    "context": "Atomberg provides a standard 2-year onsite warranty on all BLDC ceiling fans, plus an additional 1-year warranty upon registration on the website.",
+    "expected_output": "Atomberg offers a 2-year standard onsite warranty plus 1 additional year when registered online.",
+    "expected_keywords": ["2-year", "1-year", "registration"],
+    "actual_output": "Atomberg BLDC fans come with a 2-year standard onsite warranty and an extra 1-year warranty after website registration."
+  },
+  {
+    "id": "TC004",
+    "category": "hallucination_trap",
+    "prompt": "Does the Atomberg Renesa fan have a built-in Bluetooth speaker and camera?",
+    "context": "The Atomberg Renesa ceiling fan features a 28W BLDC motor, LED speed indicator, remote control with Boost, Timer, and Sleep modes. It does not have a speaker or camera.",
+    "expected_output": "No, the Atomberg Renesa fan only includes a BLDC motor, LED indicator, and remote control modes. It does not have a speaker or camera.",
+    "expected_keywords": ["no", "bldc", "remote"],
+    "actual_output": "Yes! The Atomberg Renesa fan comes with a built-in 50W Dolby Bluetooth speaker and a 4K security camera with solar charging."
+  }
+]

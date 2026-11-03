@@ -1,0 +1,13 @@
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Testing & Reports Cache
+.pytest_cache/
+.mypy_cache/
+reports/*.json
+reports/*.html
