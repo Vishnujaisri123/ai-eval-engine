@@ -29,12 +29,13 @@ def _ensure_column(connection, table_name: str, col_name: str, col_type: str):
             connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}"))
 
 
-def init_db():
+def init_db(target_engine=None):
     from app import models  # noqa: F401
-    Base.metadata.create_all(bind=engine)
+    eng = target_engine or engine
+    Base.metadata.create_all(bind=eng)
 
     # Perform lightweight migration for SQLite tables if needed
-    with engine.begin() as conn:
+    with eng.begin() as conn:
         _ensure_column(conn, "test_cases", "actual_output", "TEXT DEFAULT ''")
         _ensure_column(conn, "evaluation_runs", "notes", "TEXT DEFAULT ''")
         _ensure_column(conn, "evaluation_results", "instruction_following", "FLOAT DEFAULT 1.0")

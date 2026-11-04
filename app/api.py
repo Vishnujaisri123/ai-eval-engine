@@ -26,16 +26,30 @@ from app.services import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize SQLite database and tables on startup
-    init_db()
-    # Auto-seed starter datasets if DB is completely fresh
-    from app.database import SessionLocal
-    db = SessionLocal()
-    try:
-        from app.models import Dataset
-        if db.query(Dataset).count() == 0:
-            dataset_service.seed_starter_datasets(db)
-    finally:
-        db.close()
+    # Supports active test dependency overrides if configured
+    if get_db in app.dependency_overrides:
+        db_gen = app.dependency_overrides[get_db]()
+        try:
+            db = next(db_gen)
+            init_db(target_engine=db.get_bind())
+            from app.models import Dataset
+            if db.query(Dataset).count() == 0:
+                dataset_service.seed_starter_datasets(db)
+        finally:
+            try:
+                next(db_gen, None)
+            except StopIteration:
+                pass
+    else:
+        init_db()
+        from app.database import SessionLocal
+        db = SessionLocal()
+        try:
+            from app.models import Dataset
+            if db.query(Dataset).count() == 0:
+                dataset_service.seed_starter_datasets(db)
+        finally:
+            db.close()
     yield
 
 
