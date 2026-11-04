@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
 
@@ -13,26 +14,50 @@ class MultiTurnToolEvaluator:
     """
 
     @staticmethod
-    def evaluate_tool_call(expected_tool: Optional[Dict[str, Any]], actual_tool: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def evaluate_tool_call(
+        expected_tool: Optional[Dict[str, Any]], actual_tool: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """Validates tool name and exact parameter arguments."""
         if expected_tool is None and actual_tool is None:
             return {"tool_passed": True, "reason": "No tool call expected or made"}
         if expected_tool is None and actual_tool is not None:
-            return {"tool_passed": False, "reason": f"Unexpected tool call executed: {actual_tool.get('name')}"}
+            return {
+                "tool_passed": False,
+                "reason": f"Unexpected tool call executed: {actual_tool.get('name')}",
+            }
         if expected_tool is not None and actual_tool is None:
-            return {"tool_passed": False, "reason": f"Expected tool call missing: {expected_tool.get('name')}"}
+            return {
+                "tool_passed": False,
+                "reason": f"Expected tool call missing: {expected_tool.get('name')}",
+            }
 
         exp_name = expected_tool.get("name")
         act_name = actual_tool.get("name")
         if exp_name != act_name:
-            return {"tool_passed": False, "reason": f"Tool name mismatch: expected {exp_name}, got {act_name}"}
+            return {
+                "tool_passed": False,
+                "reason": f"Tool name mismatch: expected {exp_name}, got {act_name}",
+            }
 
         exp_args = expected_tool.get("arguments", {})
         act_args = actual_tool.get("arguments", {})
         if exp_args != act_args:
-            return {"tool_passed": False, "reason": f"Argument mismatch: expected {exp_args}, got {act_args}"}
+            return {
+                "tool_passed": False,
+                "reason": f"Argument mismatch: expected {exp_args}, got {act_args}",
+            }
 
         return {"tool_passed": True, "reason": "Tool name and arguments matched exactly"}
+
+    @staticmethod
+    def _contains_keyword(keyword: str, text: str) -> bool:
+        """
+        Matches keywords while handling plurals, spaces, and hyphens
+        (e.g., '2 hours' matches '2-hour' or '2 hours').
+        """
+        kw_norm = re.sub(r"s\b", "", keyword.lower().replace("-", " "))
+        text_norm = re.sub(r"s\b", "", text.lower().replace("-", " "))
+        return kw_norm in text_norm
 
     def evaluate_conversation_turn(self, turn: Dict[str, Any]) -> Dict[str, Any]:
         """Evaluates memory retention and tool execution for a single dialogue turn."""
@@ -45,10 +70,14 @@ class MultiTurnToolEvaluator:
 
         tool_result = self.evaluate_tool_call(expected_tool, actual_tool)
 
-        # Verify conversational context / memory retention
-        act_lower = actual_response.lower()
-        matched_kw = sum(1 for kw in expected_keywords if kw.lower() in act_lower)
-        memory_retention_score = round(matched_kw / len(expected_keywords), 2) if expected_keywords else 1.0
+        matched_kw = sum(
+            1 for kw in expected_keywords if self._contains_keyword(kw, actual_response)
+        )
+        memory_retention_score = (
+            round(matched_kw / len(expected_keywords), 2)
+            if expected_keywords
+            else 1.0
+        )
 
         passed = tool_result["tool_passed"] and (memory_retention_score >= 0.70)
 
@@ -77,7 +106,9 @@ class MultiTurnToolEvaluator:
             "turn_results": turn_results,
         }
 
-    def evaluate_dataset(self, dataset_path: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
+    def evaluate_dataset(
+        self, dataset_path: Optional[Union[str, Path]] = None
+    ) -> Dict[str, Any]:
         path = Path(dataset_path) if dataset_path else DEFAULT_MULTITURN_DATASET_PATH
         if not path.is_absolute() and not path.exists():
             path = BASE_DIR / path
@@ -94,7 +125,9 @@ class MultiTurnToolEvaluator:
                 "total_dialogue_sessions": total_sessions,
                 "passed_sessions": passed_sessions,
                 "failed_sessions": total_sessions - passed_sessions,
-                "session_pass_rate": round((passed_sessions / total_sessions) * 100, 1) if total_sessions > 0 else 0.0,
+                "session_pass_rate": round((passed_sessions / total_sessions) * 100, 1)
+                if total_sessions > 0
+                else 0.0,
             },
             "results": results,
         }
