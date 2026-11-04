@@ -85,7 +85,7 @@ def test_api_post_evaluate_endpoint():
     payload = {
         "id": "API-TC01",
         "category": "power_consumption",
-        "prompt": "How much power does the Atomberg Renesa fan consume?",
+        "prompt": "How much power does the Atomberg Renesa fan consume, and what motor does it use?",
         "context": "The Atomberg Renesa ceiling fan uses a 28W BLDC motor.",
         "expected_output": "The Atomberg Renesa fan consumes 28W using a BLDC motor.",
         "expected_keywords": ["28w", "bldc"],
@@ -162,7 +162,7 @@ def test_live_llm_generator_and_telemetry(evaluator):
     live_case = {
         "id": "LIVE-GEN-01",
         "category": "power_consumption",
-        "prompt": "How much power does the Atomberg Renesa fan consume?",
+        "prompt": "How much power does the Atomberg Renesa fan consume, and what motor does it use?",
         "context": "The Atomberg Renesa ceiling fan uses a 28W BLDC motor at speed 5.",
         "expected_output": "The Atomberg Renesa fan consumes 28W with its BLDC motor.",
         "expected_keywords": ["28w", "bldc"],

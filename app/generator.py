@@ -3,6 +3,12 @@ import time
 from typing import Dict, Any, Optional, List, Tuple
 import httpx
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 
 class LLMResponseGenerator:
     """

@@ -2,6 +2,12 @@ import os
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse, JSONResponse

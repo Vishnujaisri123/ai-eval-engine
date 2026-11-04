@@ -5,27 +5,48 @@ STOP_WORDS: Set[str] = {
     "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
     "in", "on", "at", "to", "for", "with", "by", "about", "of", "and", "or",
     "can", "i", "you", "it", "this", "that", "does", "do", "what", "how",
-    "much", "up", "after", "via", "plus", "all", "upon", "yes"
+    "much", "up", "after", "via", "plus", "all", "upon", "yes", "its", "driven", "runs", "on"
 }
 
 NEGATION_TERMS: Set[str] = {
     "no", "not", "never", "none", "without", "cannot", "cant", "doesnt", "dont", "isnt"
 }
 
+SYNONYM_MAP: Dict[str, str] = {
+    "watts": "w",
+    "watt": "w",
+    "percent": "%",
+    "percentage": "%",
+    "power": "energy",
+    "electricity": "energy",
+    "consumes": "uses",
+    "utilizes": "uses",
+    "draws": "uses",
+    "saves": "reduces",
+    "reducing": "reduces",
+    "reduction": "reduces",
+    "top": "max",
+    "maximum": "max",
+    "speed": "velocity",
+}
+
 
 def tokenize(text: str) -> Set[str]:
-    """Extracts meaningful lowercase alphanumeric tokens, excluding filler stop words."""
+    """Extracts meaningful lowercase alphanumeric tokens with domain synonym and unit normalization."""
     if not text:
         return set()
-    words = re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", text.lower())
-    return {w for w in words if w not in STOP_WORDS}
+    norm = re.sub(r"[\u2000-\u200f\u2028-\u202f\xa0]", " ", text.lower())
+    norm = re.sub(r"(\d+)[\s]+([a-z%])\b", r"\1\2", norm)
+    words = re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", norm)
+    return {SYNONYM_MAP.get(w, w) for w in words if w not in STOP_WORDS}
 
 
 def extract_numbers(text: str) -> Set[str]:
     """Extracts numeric values and units (e.g., '28w', '65%', '2-year', '50w', '4k')."""
     if not text:
         return set()
-    return set(re.findall(r"\b\d+[a-z%0-9-]*\b", text.lower()))
+    norm_text = re.sub(r"(\d+)[\s\u2000-\u200f\u2028-\u202f\xa0]+([a-z%])\b", r"\1\2", text.lower())
+    return set(re.findall(r"\b\d+[a-z%0-9-]*\b", norm_text))
 
 
 def has_negation_conflict(context: str, expected_output: str, actual_output: str) -> bool:
@@ -68,7 +89,15 @@ def calculate_accuracy(actual_output: str, expected_keywords: List[str]) -> floa
         return 1.0
 
     actual_lower = actual_output.lower()
-    matched = sum(1 for kw in expected_keywords if kw.lower() in actual_lower)
+    actual_collapsed = re.sub(r"[\s\u2000-\u200f\u2028-\u202f\xa0]+", "", actual_lower)
+
+    matched = 0
+    for kw in expected_keywords:
+        kw_clean = kw.lower().strip()
+        kw_collapsed = re.sub(r"[\s\u2000-\u200f\u2028-\u202f\xa0]+", "", kw_clean)
+        if kw_clean in actual_lower or (kw_collapsed and kw_collapsed in actual_collapsed):
+            matched += 1
+
     return round(matched / len(expected_keywords), 2)
 
 
@@ -138,10 +167,12 @@ def calculate_groundedness(
 ) -> float:
     """
     Upgraded Groundedness Metric:
-    Combines lexical support from context with penalties for fabricated numbers
+    Combines lexical support from context and expected output with penalties for fabricated numbers
     and negation contradictions.
     """
     context_tokens = tokenize(context)
+    if expected_output:
+        context_tokens |= tokenize(expected_output)
     actual_tokens = tokenize(actual_output)
 
     if not actual_tokens or not context_tokens:
@@ -173,7 +204,7 @@ def evaluate_hallucination_risk(
     threshold: float = 0.60,
 ) -> Dict[str, Any]:
     """
-    Multi-signal Hallucination Detector (Fixes Review Issue #3):
+    Multi-signal Hallucination Detector:
     Flags hallucinations using three distinct signals:
     1. Low groundedness score (< threshold)
     2. Fabricated numbers/specs not present in context
