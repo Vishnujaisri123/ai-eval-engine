@@ -1,0 +1,36 @@
+[
+  {
+    "session_id": "SESSION-IOT-01",
+    "scenario": "smart_fan_speed_and_timer_control",
+    "turns": [
+      {
+        "turn_id": 1,
+        "user_message": "Turn on my living room Atomberg Renesa fan to maximum speed.",
+        "expected_tool": {
+          "name": "set_fan_speed",
+          "arguments": {"device": "living room fan", "speed": 5}
+        },
+        "actual_tool": {
+          "name": "set_fan_speed",
+          "arguments": {"device": "living room fan", "speed": 5}
+        },
+        "expected_keywords": ["living room", "speed 5"],
+        "actual_response": "I have set your living room fan to speed 5 (maximum)."
+      },
+      {
+        "turn_id": 2,
+        "user_message": "Also set a sleep timer for it for 2 hours.",
+        "expected_tool": {
+          "name": "set_fan_timer",
+          "arguments": {"device": "living room fan", "duration_hours": 2}
+        },
+        "actual_tool": {
+          "name": "set_fan_timer",
+          "arguments": {"device": "living room fan", "duration_hours": 2}
+        },
+        "expected_keywords": ["timer", "2 hours", "living room"],
+        "actual_response": "Set a 2-hour sleep timer for the living room fan."
+      }
+    ]
+  }
+]

@@ -55,3 +55,12 @@ def evaluate_golden_dataset():
         return evaluator.evaluate_dataset("datasets/golden_dataset.json")
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+from app.safety import AISafetyEvaluator
+
+safety_evaluator = AISafetyEvaluator()
+
+
+@app.get("/evaluate/safety")
+def evaluate_safety_suite():
+    """Runs the AI Safety & Red-Teaming suite across datasets/safety_dataset.json."""
+    return safety_evaluator.evaluate_safety_dataset()
