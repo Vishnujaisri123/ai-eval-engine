@@ -88,6 +88,48 @@ export default function Settings() {
               <div className="flex items-center gap-2">
                 <Key size={16} className="text-blue" />
                 <div>
+                  <div style={{ fontWeight: 600 }}>Google Gemini API (OpenAI Compatible)</div>
+                  <div className="text-muted" style={{ fontSize: '11px' }}>
+                    GEMINI_API_KEY (gemini-3.8-flash)
+                  </div>
+                </div>
+              </div>
+              {pStatus.gemini ? (
+                <span className="badge badge-green flex items-center gap-1">
+                  <CheckCircle size={12} /> Configured
+                </span>
+              ) : (
+                <span className="badge badge-yellow flex items-center gap-1">
+                  <AlertCircle size={12} /> Not Set
+                </span>
+              )}
+            </div>
+
+            <div className="card card-sm flex items-center justify-between" style={{ background: 'var(--bg-primary)' }}>
+              <div className="flex items-center gap-2">
+                <Key size={16} className="text-yellow" />
+                <div>
+                  <div style={{ fontWeight: 600 }}>Groq Cloud API (High Speed)</div>
+                  <div className="text-muted" style={{ fontSize: '11px' }}>
+                    GROQ_API_KEY (openai/gpt-oss-20b)
+                  </div>
+                </div>
+              </div>
+              {pStatus.groq ? (
+                <span className="badge badge-green flex items-center gap-1">
+                  <CheckCircle size={12} /> Configured
+                </span>
+              ) : (
+                <span className="badge badge-yellow flex items-center gap-1">
+                  <AlertCircle size={12} /> Not Set
+                </span>
+              )}
+            </div>
+
+            <div className="card card-sm flex items-center justify-between" style={{ background: 'var(--bg-primary)' }}>
+              <div className="flex items-center gap-2">
+                <Key size={16} className="text-blue" />
+                <div>
                   <div style={{ fontWeight: 600 }}>OpenAI / OpenRouter Compatible API</div>
                   <div className="text-muted" style={{ fontSize: '11px' }}>
                     OPENAI_API_KEY / OPENROUTER_API_KEY
@@ -100,7 +142,7 @@ export default function Settings() {
                 </span>
               ) : (
                 <span className="badge badge-yellow flex items-center gap-1">
-                  <AlertCircle size={12} /> Not Set (Offline Fallback)
+                  <AlertCircle size={12} /> Not Set
                 </span>
               )}
             </div>
@@ -144,10 +186,20 @@ export default function Settings() {
             <select
               className="form-select"
               value={testProvider}
-              onChange={(e) => setTestProvider(e.target.value)}
+              onChange={(e) => {
+                const newP = e.target.value;
+                setTestProvider(newP);
+                if (newP === 'gemini') setTestModel('gemini-3.8-flash');
+                else if (newP === 'groq') setTestModel('openai/gpt-oss-20b');
+                else if (newP === 'openai') setTestModel('gpt-4o-mini');
+                else if (newP === 'ollama') setTestModel('llama3');
+                else if (newP === 'offline') setTestModel('deterministic-rag-v1');
+              }}
               disabled={testing}
             >
-              <option value="auto">Auto (Configured Live / Offline)</option>
+              <option value="auto">Auto (Gemini / Groq / OpenRouter / OpenAI / Ollama)</option>
+              <option value="gemini">Google Gemini API (gemini-3.8-flash)</option>
+              <option value="groq">Groq Cloud (openai/gpt-oss-20b)</option>
               <option value="openai">OpenAI / OpenRouter API</option>
               <option value="ollama">Ollama Localhost</option>
               <option value="offline">Offline Deterministic</option>

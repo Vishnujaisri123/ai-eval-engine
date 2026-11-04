@@ -343,10 +343,20 @@ export default function SafetyTesting() {
                 <select
                   className="form-select"
                   value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
+                  onChange={(e) => {
+                    const newP = e.target.value;
+                    setProvider(newP);
+                    if (newP === 'gemini') setModelName('gemini-3.8-flash');
+                    else if (newP === 'groq') setModelName('openai/gpt-oss-20b');
+                    else if (newP === 'openai') setModelName('gpt-4o-mini');
+                    else if (newP === 'ollama') setModelName('llama3');
+                    else if (newP === 'offline') setModelName('deterministic-safety-suite');
+                  }}
                   disabled={running}
                 >
-                  <option value="auto">Auto (Configured Live / Offline)</option>
+                  <option value="auto">Auto (Gemini / Groq / OpenRouter / OpenAI / Ollama)</option>
+                  <option value="gemini">Google Gemini API (gemini-3.8-flash)</option>
+                  <option value="groq">Groq Cloud (openai/gpt-oss-20b)</option>
                   <option value="openai">OpenAI / OpenRouter API</option>
                   <option value="ollama">Ollama Localhost</option>
                   <option value="offline">Offline Pre-recorded Benchmark</option>

@@ -221,6 +221,14 @@ export default function Playground() {
               {response && (
                 <div className="flex items-center gap-2">
                   <span className="badge badge-gray">{response.provider}</span>
+                  {response.usage_source && (
+                    <span
+                      className={`badge ${response.usage_source === 'provider' ? 'badge-green' : 'badge-yellow'}`}
+                      style={{ fontSize: '10px' }}
+                    >
+                      {response.usage_source === 'provider' ? 'Live Telemetry' : 'Estimated Tokens'}
+                    </span>
+                  )}
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
@@ -277,8 +285,13 @@ export default function Playground() {
                   <div className="card card-sm flex items-center gap-2">
                     <Zap size={16} className="text-yellow" />
                     <div>
-                      <div className="text-muted" style={{ fontSize: '10px' }}>TOTAL TOKENS</div>
-                      <div style={{ fontWeight: 600 }}>{response.tokens}</div>
+                      <div className="text-muted" style={{ fontSize: '10px' }}>TOKENS (IN / OUT)</div>
+                      <div style={{ fontWeight: 600 }}>
+                        {response.tokens}{' '}
+                        <span className="text-muted" style={{ fontSize: '11px', fontWeight: 400 }}>
+                          ({response.prompt_tokens || 0} / {response.completion_tokens || 0})
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div className="card card-sm flex items-center gap-2">

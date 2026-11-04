@@ -59,6 +59,7 @@ def run_playground(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
         "prompt_tokens": telemetry.get("prompt_tokens", 0),
         "completion_tokens": telemetry.get("completion_tokens", 0),
         "estimated_cost_usd": telemetry.get("estimated_cost_usd", 0.0),
+        "usage_source": telemetry.get("usage_source", "estimated"),
         "history_id": history.id,
     }
 

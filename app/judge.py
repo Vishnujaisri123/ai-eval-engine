@@ -89,14 +89,34 @@ class LLMJudgeEvaluator:
     LLM-as-a-Judge Evaluation Engine following the DeepEval / RAG Triad standard.
     Scores Answer Relevance, Faithfulness, and Instruction Following with structured diagnostics.
     Validates outputs against a strict Pydantic schema and handles malformed outputs cleanly.
+    Supports first-class judge execution via Gemini, Groq, OpenAI, OpenRouter, or Ollama.
     Transparently distinguishes heuristic checks from LLM-judge assessments.
     """
 
     def __init__(self, generator: Optional[LLMResponseGenerator] = None):
         judge_provider = os.getenv("JUDGE_PROVIDER")
         judge_model = os.getenv("JUDGE_MODEL")
+        judge_api_key = os.getenv("JUDGE_API_KEY")
+
         if judge_provider:
-            self.generator = LLMResponseGenerator(provider=judge_provider, model=judge_model or "llama3")
+            jp = judge_provider.strip().lower()
+            # Resolve fallback API key for judge if JUDGE_API_KEY is not explicitly set
+            resolved_key = judge_api_key
+            if not resolved_key:
+                if jp == "gemini":
+                    resolved_key = os.getenv("GEMINI_API_KEY")
+                elif jp == "groq":
+                    resolved_key = os.getenv("GROQ_API_KEY")
+                elif jp in ("openai", "openai_compatible"):
+                    resolved_key = os.getenv("OPENAI_API_KEY")
+                elif jp == "openrouter":
+                    resolved_key = os.getenv("OPENROUTER_API_KEY")
+
+            self.generator = LLMResponseGenerator(
+                provider=jp,
+                model=judge_model,
+                api_key=resolved_key,
+            )
         else:
             self.generator = generator or LLMResponseGenerator()
 
@@ -137,8 +157,9 @@ class LLMJudgeEvaluator:
         parsed_verdict: Optional[JudgeVerdictSchema] = None
         judge_provider_name = "transparent_heuristic_judge"
 
-        # If live judge provider is available (not a fallback simulator)
-        if self.generator.provider in ("openai", "openai_compatible", "ollama") and (
+        # If live judge provider is available (Gemini, Groq, OpenAI, OpenRouter, Ollama)
+        valid_judge_providers = ("gemini", "groq", "openai", "openai_compatible", "openrouter", "ollama")
+        if self.generator.provider in valid_judge_providers and (
             self.generator.api_key or self.generator.provider == "ollama"
         ):
             live_result = self.generator.generate(
@@ -150,12 +171,17 @@ class LLMJudgeEvaluator:
             if live_result.get("success"):
                 raw_json = live_result.get("actual_output", "").strip()
                 # Strip markdown code blocks if wrapped by the LLM
-                clean_json = re.sub(r"^```(?:json)?\s*", "", raw_json)
+                clean_json = re.sub(r"^```(?:json)?\s*", "", raw_json, flags=re.IGNORECASE)
                 clean_json = re.sub(r"\s*```$", "", clean_json).strip()
+                # Extract outermost JSON object if additional conversational text is returned
+                json_match = re.search(r"\{.*\}", clean_json, re.DOTALL)
+                if json_match:
+                    clean_json = json_match.group(0)
+
                 try:
                     parsed_verdict = JudgeVerdictSchema.model_validate_json(clean_json)
                     is_llm_judge = True
-                    judge_provider_name = live_result.get("provider", "llm_judge")
+                    judge_provider_name = live_result.get("provider", self.generator.provider)
                 except (ValidationError, json.JSONDecodeError):
                     parsed_verdict = None
 

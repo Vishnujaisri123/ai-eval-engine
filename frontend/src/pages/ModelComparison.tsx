@@ -14,8 +14,8 @@ export default function ModelComparison() {
   const [datasets, setDatasets] = useState<any[]>([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState('');
   const [modelsToCompare, setModelsToCompare] = useState<any[]>([
-    { model_name: 'llama3', provider: 'ollama' },
-    { model_name: 'gpt-4o', provider: 'openai' },
+    { model_name: 'gemini-3.8-flash', provider: 'gemini' },
+    { model_name: 'openai/gpt-oss-20b', provider: 'groq' },
   ]);
 
   const [loading, setLoading] = useState(true);
@@ -146,10 +146,22 @@ export default function ModelComparison() {
                     className="form-select"
                     style={{ width: '130px' }}
                     value={m.provider}
-                    onChange={(e) => updateModelField(idx, 'provider', e.target.value)}
+                    onChange={(e) => {
+                      const newProv = e.target.value;
+                      const updated = [...modelsToCompare];
+                      updated[idx].provider = newProv;
+                      if (newProv === 'gemini') updated[idx].model_name = 'gemini-3.8-flash';
+                      else if (newProv === 'groq') updated[idx].model_name = 'openai/gpt-oss-20b';
+                      else if (newProv === 'openai') updated[idx].model_name = 'gpt-4o-mini';
+                      else if (newProv === 'ollama') updated[idx].model_name = 'llama3';
+                      else if (newProv === 'offline') updated[idx].model_name = 'deterministic-rag-v1';
+                      setModelsToCompare(updated);
+                    }}
                     disabled={comparing}
                   >
                     <option value="auto">Auto</option>
+                    <option value="gemini">Gemini</option>
+                    <option value="groq">Groq</option>
                     <option value="openai">OpenAI</option>
                     <option value="ollama">Ollama</option>
                     <option value="offline">Offline</option>

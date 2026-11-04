@@ -87,7 +87,12 @@ class EvaluationRequest(BaseModel):
 # ── Existing Required Endpoints (Strict Compatibility) ────────────────────────
 @app.get("/health")
 def health_check():
-    has_api_key = bool(os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY"))
+    has_api_key = bool(
+        os.getenv("GEMINI_API_KEY")
+        or os.getenv("GROQ_API_KEY")
+        or os.getenv("OPENROUTER_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
+    )
     provider = os.getenv("LLM_PROVIDER", "auto")
     model = os.getenv("LLM_MODEL", "llama3")
     return {
@@ -412,7 +417,11 @@ def list_models():
     ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     judge_provider = os.getenv("JUDGE_PROVIDER", "transparent_heuristic")
     judge_model = os.getenv("JUDGE_MODEL", "heuristic-rubric")
-    has_api_key = bool(os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY"))
+    has_gemini = bool(os.getenv("GEMINI_API_KEY"))
+    has_groq = bool(os.getenv("GROQ_API_KEY"))
+    has_openai = bool(os.getenv("OPENAI_API_KEY"))
+    has_openrouter = bool(os.getenv("OPENROUTER_API_KEY"))
+    has_live = has_gemini or has_groq or has_openai or has_openrouter
 
     configured = [
         {
@@ -421,7 +430,37 @@ def list_models():
             "provider": provider,
             "model_name": model,
             "is_active": True,
-            "has_credentials": has_api_key or provider == "ollama",
+            "has_credentials": (
+                (provider == "gemini" and has_gemini)
+                or (provider == "groq" and has_groq)
+                or (provider in ("openai", "openrouter") and (has_openai or has_openrouter))
+                or (provider == "auto" and has_live)
+                or (provider in ("ollama", "offline", "deterministic"))
+            ),
+        },
+        {
+            "id": "gemini_provider",
+            "name": "Google Gemini (gemini-3.8-flash)",
+            "provider": "gemini",
+            "model_name": os.getenv("GEMINI_MODEL", "gemini-3.8-flash"),
+            "is_active": provider == "gemini",
+            "has_credentials": has_gemini,
+        },
+        {
+            "id": "groq_provider",
+            "name": "Groq Cloud (openai/gpt-oss-20b)",
+            "provider": "groq",
+            "model_name": os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"),
+            "is_active": provider == "groq",
+            "has_credentials": has_groq,
+        },
+        {
+            "id": "openai_provider",
+            "name": "OpenAI / OpenRouter API",
+            "provider": "openai",
+            "model_name": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            "is_active": provider in ("openai", "openrouter"),
+            "has_credentials": has_openai or has_openrouter,
         },
         {
             "id": "ollama_local",
@@ -429,7 +468,7 @@ def list_models():
             "provider": "ollama",
             "model_name": os.getenv("OLLAMA_MODEL", "llama3"),
             "base_url": ollama_url,
-            "is_active": True,
+            "is_active": provider == "ollama",
             "has_credentials": True,
         },
         {
@@ -437,7 +476,7 @@ def list_models():
             "name": "Offline Deterministic Benchmark",
             "provider": "offline",
             "model_name": "deterministic-rag-v1",
-            "is_active": True,
+            "is_active": provider in ("offline", "deterministic"),
             "has_credentials": True,
         },
     ]
@@ -450,7 +489,9 @@ def list_models():
         "judge_provider": judge_provider,
         "judge_model": judge_model,
         "provider_status": {
-            "openai_compatible": has_api_key,
+            "gemini": has_gemini,
+            "groq": has_groq,
+            "openai_compatible": (has_openai or has_openrouter),
             "ollama_configured": bool(ollama_url),
             "offline_deterministic": True,
         },
@@ -468,6 +509,7 @@ def test_connection(payload: ConnectionTestRequest):
     gen = LLMResponseGenerator(
         provider=payload.provider,
         model=payload.model,
+        base_url=payload.base_url or None,
         ollama_url=payload.base_url or None,
     )
     result = gen.generate(
