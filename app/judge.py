@@ -1,6 +1,10 @@
+import json
 import math
+import os
 import re
 from typing import Dict, Any, List, Optional, Set
+from pydantic import BaseModel, Field, ValidationError
+
 from app.generator import LLMResponseGenerator
 
 # Domain semantic synonym map for smart appliances
@@ -28,7 +32,6 @@ def normalize_semantic_tokens(text: str) -> List[str]:
     raw_tokens = re.findall(r"[a-z0-9%]+", text.lower())
     normalized = []
     for token in raw_tokens:
-        # Normalize unit prefixes like '28w' into '28' and 'w'
         m = re.match(r"^(\d+)([a-z%]+)$", token)
         if m:
             num, unit = m.groups()
@@ -43,6 +46,8 @@ def calculate_semantic_similarity(text_a: str, text_b: str) -> float:
     """
     Computes hybrid cosine semantic similarity using normalized domain tokens.
     Correctly recognizes paraphrased technical claims.
+    Note: Semantic similarity measures vocabulary and phrasing alignment;
+    it does NOT constitute absolute proof of factual ground truth.
     """
     tokens_a = normalize_semantic_tokens(text_a)
     tokens_b = normalize_semantic_tokens(text_b)
@@ -52,7 +57,6 @@ def calculate_semantic_similarity(text_a: str, text_b: str) -> float:
 
     vocab: Set[str] = set(tokens_a) | set(tokens_b)
 
-    # Compute term frequency vectors
     vec_a = {w: tokens_a.count(w) for w in vocab}
     vec_b = {w: tokens_b.count(w) for w in vocab}
 
@@ -67,65 +71,150 @@ def calculate_semantic_similarity(text_a: str, text_b: str) -> float:
     return round(max(0.0, min(cosine, 1.0)), 2)
 
 
+class JudgeVerdictSchema(BaseModel):
+    """Pydantic schema to validate LLM Judge structured output."""
+    faithfulness_score: float = Field(default=1.0, ge=0.0, le=1.0)
+    relevance_score: float = Field(default=1.0, ge=0.0, le=1.0)
+    instruction_following_score: float = Field(default=1.0, ge=0.0, le=1.0)
+    overall_judge_score: float = Field(default=1.0, ge=0.0, le=1.0)
+    hallucination_verdict: str = Field(default="none")  # none, minor, critical
+    passed: bool = True
+    explanation: str = Field(default="")
+    evidence_summary: str = Field(default="")
+    detected_issues: List[str] = Field(default_factory=list)
+
+
 class LLMJudgeEvaluator:
     """
     LLM-as-a-Judge Evaluation Engine following the DeepEval / RAG Triad standard.
-    Scores Answer Relevance and Faithfulness with structured diagnostics.
+    Scores Answer Relevance, Faithfulness, and Instruction Following with structured diagnostics.
+    Validates outputs against a strict Pydantic schema and handles malformed outputs cleanly.
+    Transparently distinguishes heuristic checks from LLM-judge assessments.
     """
 
     def __init__(self, generator: Optional[LLMResponseGenerator] = None):
-        self.generator = generator or LLMResponseGenerator()
+        judge_provider = os.getenv("JUDGE_PROVIDER")
+        judge_model = os.getenv("JUDGE_MODEL")
+        if judge_provider:
+            self.generator = LLMResponseGenerator(provider=judge_provider, model=judge_model or "llama3")
+        else:
+            self.generator = generator or LLMResponseGenerator()
 
     def evaluate_with_judge(
-        self, prompt: str, context: str, actual_output: str
+        self,
+        prompt: str,
+        context: str,
+        actual_output: str,
+        system_instructions: str = "",
+        expected_output: str = "",
+        threshold: float = 0.70,
     ) -> Dict[str, Any]:
-        semantic_sim = calculate_semantic_similarity(context, actual_output)
+        semantic_sim = calculate_semantic_similarity(context or expected_output, actual_output)
 
         judge_prompt = (
             "You are an expert AI Quality Judge evaluating an AI Assistant's response.\n"
-            "Analyze the response strictly against the retrieved context and question.\n\n"
+            "Analyze the response strictly against the context, instructions, and prompt.\n"
+            "Return ONLY a valid JSON object with no markdown formatting.\n\n"
             f"Context: {context}\n"
+            f"Instructions: {system_instructions}\n"
             f"Question: {prompt}\n"
             f"AI Response: {actual_output}\n\n"
-            "Evaluate and return JSON with:\n"
-            "1. faithfulness_score: float 0.0 to 1.0\n"
-            "2. relevance_score: float 0.0 to 1.0\n"
-            "3. hallucination_verdict: 'none', 'minor', or 'critical'\n"
-            "4. reasoning: brief explanation\n"
+            "JSON structure required:\n"
+            "{\n"
+            '  "faithfulness_score": <float 0.0 to 1.0>,\n'
+            '  "relevance_score": <float 0.0 to 1.0>,\n'
+            '  "instruction_following_score": <float 0.0 to 1.0>,\n'
+            '  "overall_judge_score": <float 0.0 to 1.0>,\n'
+            '  "hallucination_verdict": "none" | "minor" | "critical",\n'
+            '  "passed": <boolean>,\n'
+            '  "explanation": "<summary string>",\n'
+            '  "evidence_summary": "<evidence string>",\n'
+            '  "detected_issues": ["<issue1>", ...]\n'
+            "}"
         )
 
-        live_result = self.generator.generate(prompt=judge_prompt, context=context)
+        is_llm_judge = False
+        parsed_verdict: Optional[JudgeVerdictSchema] = None
+        judge_provider_name = "transparent_heuristic_judge"
 
-        # Deterministic Judge Parser / Rubric
-        faithfulness = 1.0
-        relevance = 1.0
-        verdict = "none"
-        reasoning = "Response is fully grounded in retrieved context."
+        # If live judge provider is available (not a fallback simulator)
+        if self.generator.provider in ("openai", "openai_compatible", "ollama") and (
+            self.generator.api_key or self.generator.provider == "ollama"
+        ):
+            live_result = self.generator.generate(
+                prompt=judge_prompt,
+                context="",
+                temperature=0.0,
+                allow_offline_fallback=False,
+            )
+            if live_result.get("success"):
+                raw_json = live_result.get("actual_output", "").strip()
+                # Strip markdown code blocks if wrapped by the LLM
+                clean_json = re.sub(r"^```(?:json)?\s*", "", raw_json)
+                clean_json = re.sub(r"\s*```$", "", clean_json).strip()
+                try:
+                    parsed_verdict = JudgeVerdictSchema.model_validate_json(clean_json)
+                    is_llm_judge = True
+                    judge_provider_name = live_result.get("provider", "llm_judge")
+                except (ValidationError, json.JSONDecodeError):
+                    parsed_verdict = None
 
-        actual_lower = actual_output.lower()
-        context_lower = context.lower()
+        # Deterministic Heuristic Fallback / Standard Rubric
+        if parsed_verdict is None:
+            actual_lower = actual_output.lower()
+            context_lower = context.lower()
 
-        # Check for fabricated specs/features
-        fabricated_terms = ["speaker", "camera", "solar", "4k", "dolby"]
-        found_fabrications = [
-            t for t in fabricated_terms if t in actual_lower and t not in context_lower
-        ]
+            # Check for fabricated specs/features
+            fabricated_terms = ["speaker", "camera", "solar", "4k", "dolby"]
+            found_fabrications = [
+                t for t in fabricated_terms if t in actual_lower and t not in context_lower
+            ]
 
-        if found_fabrications:
-            faithfulness = 0.20
-            relevance = 0.40
-            verdict = "critical"
-            reasoning = f"Critical hallucination: Fabricated features not in context: {found_fabrications}"
-        elif semantic_sim < 0.35:
-            faithfulness = 0.40
-            verdict = "minor"
-            reasoning = "Low contextual alignment with source reference."
+            faithfulness = 1.0
+            relevance = 1.0
+            instruction_following = 1.0
+            verdict = "none"
+            detected_issues = []
+            reasoning = "Response is grounded and relevant to the reference context."
+
+            if found_fabrications:
+                faithfulness = 0.20
+                relevance = 0.40
+                verdict = "critical"
+                detected_issues.append(f"Fabricated features not in context: {found_fabrications}")
+                reasoning = f"Critical hallucination: Fabricated features not in context: {found_fabrications}"
+            elif context and semantic_sim < 0.35:
+                faithfulness = 0.40
+                verdict = "minor"
+                detected_issues.append("Low contextual alignment with source reference")
+                reasoning = "Low contextual alignment with source reference."
+
+            overall = round((faithfulness * 0.5) + (relevance * 0.3) + (instruction_following * 0.2), 2)
+            passed = overall >= threshold and verdict != "critical"
+
+            parsed_verdict = JudgeVerdictSchema(
+                faithfulness_score=faithfulness,
+                relevance_score=relevance,
+                instruction_following_score=instruction_following,
+                overall_judge_score=overall,
+                hallucination_verdict=verdict,
+                passed=passed,
+                explanation=reasoning,
+                evidence_summary=f"Semantic similarity: {semantic_sim}, Issues: {len(detected_issues)}",
+                detected_issues=detected_issues,
+            )
 
         return {
             "semantic_similarity": semantic_sim,
-            "faithfulness_score": faithfulness,
-            "relevance_score": relevance,
-            "hallucination_verdict": verdict,
-            "judge_reasoning": reasoning,
-            "judge_provider": live_result.get("provider", "deterministic_judge"),
+            "faithfulness_score": parsed_verdict.faithfulness_score,
+            "relevance_score": parsed_verdict.relevance_score,
+            "instruction_following_score": parsed_verdict.instruction_following_score,
+            "overall_judge_score": parsed_verdict.overall_judge_score,
+            "hallucination_verdict": parsed_verdict.hallucination_verdict,
+            "judge_reasoning": parsed_verdict.explanation,
+            "judge_provider": judge_provider_name,
+            "is_llm_judge": is_llm_judge,
+            "detected_issues": parsed_verdict.detected_issues,
+            "evidence_summary": parsed_verdict.evidence_summary,
+            "judge_passed": parsed_verdict.passed,
         }

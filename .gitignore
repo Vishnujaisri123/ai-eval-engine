@@ -6,8 +6,24 @@ __pycache__/
 venv/
 ENV/
 
+# Secrets & Environment variables
+.env
+*.env.local
+
+# Database & SQLite files
+*.db
+*.sqlite3
+
+# Node & Frontend
+node_modules/
+dist/
+.eslintcache
+
 # Testing & Reports Cache
 .pytest_cache/
 .mypy_cache/
 reports/*.json
 reports/*.html
+reports/*.csv
+screenshot*.png
+frontend/screenshot*.png

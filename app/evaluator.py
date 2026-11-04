@@ -9,6 +9,8 @@ from app.metrics import (
     calculate_accuracy,
     calculate_relevance,
     calculate_groundedness,
+    calculate_instruction_following,
+    calculate_token_f1,
     evaluate_hallucination_risk,
 )
 
@@ -22,6 +24,7 @@ class AIQualityEvaluator:
     - Deterministic Accuracy, Relevance, and Groundedness
     - Multi-signal Hallucination Diagnostics (negation + numeric integrity)
     - Semantic Similarity (paraphrase recognition)
+    - Instruction Following (negative constraints + formatting)
     - LLM-as-a-Judge / RAG Triad Faithfulness
     - Telemetry (Latency, Token Counts, API Cost, Evaluation Duration)
     """
@@ -49,6 +52,7 @@ class AIQualityEvaluator:
         case_id = test_case.get("id", "CUSTOM")
         category = test_case.get("category", "general")
         prompt = test_case.get("prompt", "")
+        system_instructions = test_case.get("system_instructions", "")
         context = test_case.get("context", "")
         expected_output = test_case.get("expected_output", "")
         expected_keywords = test_case.get("expected_keywords", [])
@@ -56,7 +60,11 @@ class AIQualityEvaluator:
 
         # 1. Generate live AI response if requested or if actual_output is empty
         if use_live_generator or not actual_output.strip():
-            gen_result = self.generator.generate(prompt=prompt, context=context)
+            gen_result = self.generator.generate(
+                prompt=prompt,
+                context=context,
+                system_prompt=system_instructions,
+            )
             actual_output = gen_result["actual_output"]
             telemetry = gen_result["telemetry"]
             provider = gen_result["provider"]
@@ -75,15 +83,22 @@ class AIQualityEvaluator:
             provider = "stored_dataset"
 
         # 1.5 Semantic similarity & LLM-as-a-Judge scoring
-        semantic_sim = calculate_semantic_similarity(expected_output, actual_output)
+        semantic_sim = calculate_semantic_similarity(expected_output or context, actual_output)
         judge_verdict = self.judge.evaluate_with_judge(
-            prompt=prompt, context=context, actual_output=actual_output
+            prompt=prompt,
+            context=context,
+            actual_output=actual_output,
+            system_instructions=system_instructions,
+            expected_output=expected_output,
+            threshold=self.pass_threshold,
         )
 
         # 2. Compute deterministic quality metrics
         accuracy = calculate_accuracy(actual_output, expected_keywords)
         relevance = calculate_relevance(prompt, expected_output, actual_output)
         groundedness = calculate_groundedness(context, actual_output, expected_output)
+        instr_eval = calculate_instruction_following(system_instructions, actual_output)
+        token_f1 = calculate_token_f1(expected_output, actual_output)
 
         # 3. Multi-signal hallucination analysis
         hallucination_info = evaluate_hallucination_risk(
@@ -99,6 +114,7 @@ class AIQualityEvaluator:
         )
 
         # 4. Overall quality score & pass/fail gate
+        # Preserving original 4-term average for backwards compatibility
         overall_score = round(
             (accuracy + relevance + groundedness + semantic_sim) / 4.0, 2
         )
@@ -118,6 +134,8 @@ class AIQualityEvaluator:
                 "relevance": relevance,
                 "groundedness": groundedness,
                 "semantic_similarity": semantic_sim,
+                "instruction_following": instr_eval["score"],
+                "token_f1": token_f1,
                 "judge_faithfulness": judge_verdict["faithfulness_score"],
                 "overall_score": overall_score,
             },
@@ -125,6 +143,7 @@ class AIQualityEvaluator:
             "performance": telemetry,
             "hallucination_detected": hallucinated,
             "hallucination_reasons": hallucination_info["hallucination_reasons"],
+            "instruction_violations": instr_eval["violations"],
             "passed": passed,
         }
 
@@ -181,39 +200,22 @@ class AIQualityEvaluator:
             if total_cases > 0
             else 0.0
         )
+        pass_rate = (
+            round((passed_cases / total_cases) * 100.0, 1) if total_cases > 0 else 0.0
+        )
 
         return {
             "summary": {
                 "total_cases": total_cases,
                 "passed_cases": passed_cases,
                 "failed_cases": failed_cases,
-                "pass_rate": round((passed_cases / total_cases) * 100, 1) if total_cases > 0 else 0.0,
-                "failure_rate": round((failed_cases / total_cases) * 100, 1) if total_cases > 0 else 0.0,
+                "pass_rate": pass_rate,
                 "average_quality_score": avg_score,
                 "hallucinations_detected": hallucination_count,
-                "total_tokens": total_tokens,
-                "estimated_total_cost_usd": total_cost_usd,
+                "total_tokens_consumed": total_tokens,
+                "total_cost_usd": total_cost_usd,
                 "average_latency_ms": avg_latency_ms,
                 "evaluation_duration_ms": total_duration_ms,
             },
             "results": results,
         }
-
-
-if __name__ == "__main__":
-    evaluator = AIQualityEvaluator()
-    report = evaluator.evaluate_dataset()
-    print("\n=== ATOMBERG AI QUALITY & DUAL-LAYER EVALUATION SUMMARY (v2.2) ===")
-    print(json.dumps(report["summary"], indent=2))
-    print("\n=== CASE BREAKDOWN WITH SEMANTIC & JUDGE SCORES ===")
-    for item in report["results"]:
-        status = "PASS" if item["passed"] else "FAIL (HALLUCINATION)" if item["hallucination_detected"] else "FAIL"
-        m = item["metrics"]
-        jv = item["judge_verdict"]
-        print(
-            f"[{item['id']}] {status} | Overall: {m['overall_score']} "
-            f"(Acc: {m['accuracy']}, Rel: {m['relevance']}, Grd: {m['groundedness']}, "
-            f"SemanticSim: {m['semantic_similarity']}, JudgeFaith: {jv['faithfulness_score']})"
-        )
-        if item["hallucination_detected"]:
-            print(f"       -> Judge Verdict: {jv['hallucination_verdict']} | Reasoning: {jv['judge_reasoning']}")

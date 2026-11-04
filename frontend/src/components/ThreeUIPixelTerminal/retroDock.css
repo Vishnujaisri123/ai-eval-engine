@@ -1,0 +1,391 @@
+/**
+ * ThreeUI Animated Top Dock - Retro Variant Styling
+ * Preserved from @designcodeio/threeui (ThreeUI Community)
+ * 
+ * MIT License
+ * Copyright (c) 2026 Meng To
+ */
+
+.pixel-terminal-top-dock {
+  --atd-top: clamp(12px, 1.8cqw, 28px);
+  --atd-bar-width: min(1440px, calc(100% - clamp(16px, 3cqw, 64px)));
+  --atd-bar-height: clamp(46px, 3.2cqw, 58px);
+  --atd-item-height: clamp(32px, 2.2cqw, 42px);
+  --atd-label: clamp(11px, 0.72cqw, 14px);
+  --atd-icon: clamp(12px, 0.85cqw, 16px);
+  --atd-brand: clamp(12px, 0.86cqw, 16px);
+  --atd-gap: clamp(6px, 0.5cqw, 10px);
+  --atd-retro-scan: 0.32;
+  
+  position: relative;
+  width: 100%;
+  height: clamp(110px, 12vh, 140px);
+  min-height: 100px;
+  overflow: hidden;
+  background: #0b0819;
+  border-bottom: 2px solid #361753;
+  user-select: none;
+  isolation: isolate;
+  flex-shrink: 0;
+}
+
+/* Background WebGL canvas with Bayer 8x8 ordered dither */
+.atd-retro__field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+}
+
+/* Dusk vignette */
+.atd-retro__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(124% 90% at 50% 34%, transparent 28%, rgba(6, 4, 16, 0.62) 100%),
+              linear-gradient(180deg, rgba(6, 4, 16, 0.6) 0%, transparent 24%, transparent 62%, rgba(6, 4, 16, 0.58) 100%);
+}
+
+/* CRT Scanline overlay */
+.pixel-terminal-top-dock::before {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
+  content: "";
+  opacity: calc(var(--atd-retro-scan, 0.32) * 1.5);
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0 1px, transparent 1px 3px);
+}
+
+/* The floating fitted dock chassis */
+.atd-retro__bar {
+  position: absolute;
+  top: var(--atd-top);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  width: var(--atd-bar-width);
+  height: var(--atd-bar-height);
+  overflow: hidden;
+  border: 2px solid #f4e6c8;
+  background: #1a1030;
+  box-shadow: 0 8px 0 rgba(6, 4, 16, 0.8), 0 16px 32px rgba(0, 0, 0, 0.75);
+}
+
+/* Brand Section */
+.atd-retro__brand {
+  display: inline-flex;
+  flex: none;
+  gap: clamp(8px, 0.7cqw, 14px);
+  align-items: center;
+  height: 100%;
+  padding: 0 clamp(14px, 1.3cqw, 24px);
+  border-right: 2px solid #4b2f7e;
+  color: #f9c74f;
+  background: #150c28;
+  font: 700 var(--atd-brand) / 1 'ThreeUI Fragment Mono', 'Courier New', monospace;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.atd-retro__badge {
+  display: inline-flex;
+  width: var(--atd-icon);
+  height: var(--atd-icon);
+  color: #f9c74f;
+}
+
+.atd-retro__badge svg,
+.atd-retro__icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  shape-rendering: crispEdges;
+}
+
+/* Nav Strip */
+.atd-retro__dock {
+  display: flex;
+  flex: 1 1 0;
+  gap: 0;
+  align-items: stretch;
+  min-width: 0;
+  height: 100%;
+}
+
+/* Menu Items */
+.atd-retro__item {
+  display: inline-flex;
+  flex: 1 1 auto;
+  gap: var(--atd-gap);
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-width: 0;
+  padding: 0 clamp(8px, 0.9cqw, 18px);
+  overflow: hidden;
+  border: 0;
+  border-right: 2px solid #4b2f7e;
+  color: #b9a7e8;
+  background: #241548;
+  font: 600 var(--atd-label) / 1 'ThreeUI Fragment Mono', 'Courier New', monospace;
+  letter-spacing: 0.14em;
+  text-decoration: none;
+  white-space: nowrap;
+  outline: none;
+  cursor: pointer;
+  transition: color 0.1s steps(2), background 0.1s steps(2);
+  will-change: width;
+}
+
+.atd-retro__item span:last-child {
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atd-retro__icon {
+  display: inline-flex;
+  flex: none;
+  width: var(--atd-icon);
+  height: var(--atd-icon);
+}
+
+/* Hover & Proximity Near State */
+.atd-retro__item[data-dock-near="true"],
+.atd-retro__item:hover,
+.atd-retro__item:focus-visible {
+  color: #fff4d6;
+  background: #3a2170;
+}
+
+/* Active Pressed / Selected Route State */
+.atd-retro__item[aria-pressed="true"],
+.atd-retro__item.is-active {
+  color: #1a1030;
+  background: #f9c74f;
+  font-weight: 700;
+}
+
+.atd-retro__item[aria-pressed="true"] .atd-retro__icon,
+.atd-retro__item.is-active .atd-retro__icon {
+  color: #1a1030;
+}
+
+/* CTA Action Button */
+.atd-retro__cta {
+  display: inline-flex;
+  flex: none;
+  gap: var(--atd-gap);
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 clamp(16px, 1.4cqw, 30px);
+  border: 0;
+  border-left: 2px solid #f4e6c8;
+  color: #1a1030;
+  background: #f47b5c;
+  font: 700 var(--atd-label) / 1 'ThreeUI Fragment Mono', 'Courier New', monospace;
+  letter-spacing: 0.16em;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s steps(2), color 0.1s steps(2);
+}
+
+.atd-retro__cta:hover {
+  color: #1a1030;
+  background: #f9c74f;
+}
+
+.atd-retro__cta span {
+  font-size: 10px;
+}
+
+/* Terminal Readout HUD */
+.atd-retro__readout {
+  position: absolute;
+  bottom: clamp(10px, 1.5vh, 20px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 2.5cqw, 48px);
+  margin: 0;
+  color: #a08fd4;
+  font: 400 clamp(9px, 0.65cqw, 12px) / 1 'ThreeUI Fragment Mono', 'Courier New', monospace;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.atd-retro__readout span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.atd-retro__readout span::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  background: #f47b5c;
+  box-shadow: 0 0 6px #f47b5c;
+}
+
+/* Caption */
+.animated-top-dock-component__caption {
+  position: absolute;
+  bottom: 4px;
+  right: 18px;
+  z-index: 12;
+  margin: 0;
+  font: 400 9px / 1 'ThreeUI Fragment Mono', monospace;
+  letter-spacing: 0.18em;
+  color: #7b6ab0;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Secondary Sub-Bar Strip */
+.pixel-secondary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px clamp(16px, 3cqw, 64px);
+  background: #110924;
+  border-bottom: 1px solid #361753;
+  font-family: 'ThreeUI Fragment Mono', 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  z-index: 20;
+}
+
+.pixel-secondary-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pixel-sec-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid #361753;
+  background: #1a1030;
+  color: #b9a7e8;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  transition: all 0.15s ease;
+}
+
+.pixel-sec-link:hover {
+  background: #2d1a54;
+  color: #fff4d6;
+  border-color: #652160;
+}
+
+.pixel-sec-link.is-active {
+  background: #361753;
+  color: #f9c74f;
+  border-color: #f9c74f;
+  font-weight: 700;
+}
+
+.pixel-status-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.pixel-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pixel-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 8px #4ade80;
+}
+
+.pixel-status-dot.offline {
+  background: #f87171;
+  box-shadow: 0 0 8px #f87171;
+}
+
+/* Mobile & Reduced Motion */
+@media (max-width: 768px) {
+  .pixel-terminal-top-dock {
+    height: auto;
+    min-height: 80px;
+    padding-bottom: 12px;
+  }
+  .atd-retro__bar {
+    position: relative;
+    top: 8px;
+    left: auto;
+    transform: none;
+    margin: 0 auto;
+    width: 95%;
+    flex-wrap: wrap;
+    height: auto;
+  }
+  .atd-retro__brand {
+    width: 100%;
+    height: 38px;
+    border-right: none;
+    border-bottom: 2px solid #4b2f7e;
+    justify-content: center;
+  }
+  .atd-retro__dock {
+    width: 100%;
+    overflow-x: auto;
+  }
+  .atd-retro__item {
+    padding: 8px 12px;
+  }
+  .atd-retro__cta {
+    display: none;
+  }
+  .atd-retro__readout {
+    display: none;
+  }
+  .pixel-secondary-bar {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .pixel-secondary-links {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atd-retro__item {
+    transform: none !important;
+    transition: none !important;
+  }
+}

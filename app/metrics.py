@@ -86,6 +86,53 @@ def calculate_relevance(prompt: str, expected_output: str, actual_output: str) -
     return round(min(score, 1.0), 2)
 
 
+def calculate_token_f1(expected_output: str, actual_output: str) -> float:
+    """Calculates token-level F1 score between expected and actual output."""
+    exp_tokens = tokenize(expected_output)
+    act_tokens = tokenize(actual_output)
+    if not exp_tokens and not act_tokens:
+        return 1.0
+    if not exp_tokens or not act_tokens:
+        return 0.0
+    common = exp_tokens.intersection(act_tokens)
+    if not common:
+        return 0.0
+    precision = len(common) / len(act_tokens)
+    recall = len(common) / len(exp_tokens)
+    f1 = 2 * (precision * recall) / (precision + recall)
+    return round(f1, 3)
+
+
+def calculate_instruction_following(
+    system_instructions: str, actual_output: str
+) -> Dict[str, Any]:
+    """
+    Evaluates whether the actual output respects instructions such as
+    negative constraints ("do not mention X", "never output Y"), length constraints,
+    or formatting constraints.
+    """
+    if not system_instructions:
+        return {"score": 1.0, "violations": []}
+
+    instr_lower = system_instructions.lower()
+    actual_lower = actual_output.lower()
+    violations = []
+
+    # Check negative constraints: "do not mention X", "never disclose X", "without X"
+    neg_matches = re.findall(r"(?:do not|don't|never|must not)\s+(?:mention|include|say|use|disclose)\s+([a-z0-9_-]+)", instr_lower)
+    for forbidden in neg_matches:
+        if forbidden in actual_lower:
+            violations.append(f"Forbidden term mentioned: '{forbidden}'")
+
+    # Check JSON output constraint if requested
+    if "json" in instr_lower and ("return json" in instr_lower or "output in json" in instr_lower or "respond in json" in instr_lower):
+        if not (actual_output.strip().startswith("{") and actual_output.strip().endswith("}")):
+            violations.append("Response is not formatted as valid JSON object")
+
+    score = 1.0 if not violations else max(0.0, round(1.0 - (0.4 * len(violations)), 2))
+    return {"score": score, "violations": violations}
+
+
 def calculate_groundedness(
     context: str, actual_output: str, expected_output: str = ""
 ) -> float:
